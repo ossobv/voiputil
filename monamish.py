@@ -37,7 +37,7 @@ def channel_originate(ami_kwarg, channel, params=None):
     nothing. If it fails, you'll get an exception in your face.
     """
     if 'Channel' in params:
-        raise TypeError()
+        raise TypeError('missing "Channel" in params %r' % (params,))
     params['Channel'] = channel
 
     s = SequentialAmi(disconnect_mode=SequentialAmi.DIS_IMMEDIATELY,
@@ -84,7 +84,7 @@ def _fetch_eventinfo(ami_kwargs, command, params, end_event):
     success_count = len(ami_kwargs) - len(errors)
 
     if not success_count:
-        raise ValueError('Command failed on all asterisken.')
+        raise ValueError('Command failed on all asterisken')
 
     return data
 

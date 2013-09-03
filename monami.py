@@ -109,7 +109,9 @@ class TokenBufferedSocket(object):
         return bool(rlist or wlist)
 
     def on_data(self, data):
-        '''Called for incoming data.'''
+        """
+        Called for incoming data.
+        """
         if self._on_data:
             self._on_data(data)
         else:
@@ -209,12 +211,16 @@ class MonAmiError(MonAmiException):
 class MonAmiFinished(MonAmiException):
     """
     Raised from work() when disconnect_mode is not DIS_NEVER and we're done.
+
+    XXX: should we inherit from StopIteration?
     """
     pass
 
 
 class MonAmiTimeout(MonAmiException):
-    '''Raised from process() when we're not done, but a timeout is reached.'''
+    """
+    Raised from process() when we're not done, but a timeout is reached.
+    """
     pass
 
 
@@ -295,10 +301,12 @@ class SequentialAmi(object):
         pass
 
     def add_action(self, action, parameters, callback=None, stop_event=None):
-        '''Add an action to fire when the previous action has completed. If you
+        """
+        Add an action to fire when the previous action has completed. If you
         supply a custom callback, you don't need to call next_action(). It will
         be done for you. If you supply stop_event, a command will not be marked
-        as completed until a that event has been received.'''
+        as completed until a that event has been received.
+        """
         self._action_id += 1
         identifier = self._action_id_prefix + str(self._action_id)
         parameters['Action'] = action
@@ -310,10 +318,12 @@ class SequentialAmi(object):
         self._outbuf.append(msg)
 
     def next_action(self):
-        '''Load up the next action. This is called by the default on_response()
+        """
+        Load up the next action. This is called by the default on_response()
         handler. If there are no more actions to be done, the connection is
         terminated, unless of course when disconnect_mode is never, in which
-        case nothing is done.'''
+        case nothing is done.
+        """
         if self._outbuf:
             data = self._outbuf.pop(0)
             self.trace('}} %r\n' % (data,))
@@ -335,7 +345,7 @@ class SequentialAmi(object):
             self._sock.loop(absolute_timeout=absolute_timeout,
                             relative_timeout=relative_timeout)
             if not self._done:
-                raise MonAmiTimeout()
+                raise MonAmiTimeout()  # XXX: add delta
         else:
             # First log in.. first then go to infinite loop mode
             # (work() takes 0.333 seconds per run if no data is received)
