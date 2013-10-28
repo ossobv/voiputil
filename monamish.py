@@ -90,14 +90,12 @@ def _fetch_eventinfo(ami_kwargs, command, params, end_event):
 
 
 def fetch_queuestatus(ami_kwargs, queue_id):
-    assert queue_id.isdigit()
     data = _fetch_eventinfo(ami_kwargs, 'QueueStatus', {'Queue': queue_id},
                             'QueueStatusComplete')
     return translate_queuestatus(data)
 
 
 def fetch_queuesummary(ami_kwargs, queue_id):
-    assert queue_id.isdigit()
     data = _fetch_eventinfo(ami_kwargs, 'QueueSummary', {'Queue': queue_id},
                             'QueueSummaryComplete')
     return translate_queuesummary(data)
