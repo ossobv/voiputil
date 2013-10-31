@@ -462,8 +462,6 @@ class SequentialAmi(object):
         }, callback=self._on_login_response, insertpos=0)
 
     def _on_login_response(self, response, request):
-        print request
-        print response
         # Set the regular keepalive time instead of the during-login keepalive
         # time.
         self._keepalive = self._user_keepalive
