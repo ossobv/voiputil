@@ -335,8 +335,13 @@ class SequentialAmi(object):
         This may be expected or unexpected, but it is not matched to a
         requested action by ActionID.
         """
-        print 'Unexpected:', dict
-        pass
+        if dict.get('Event'):
+            print 'Got event: %s\n%s\n' % (dict['Event'],
+                                           '\n'.join('  %s\t%r' % (k, v)
+                                                     for k, v in dict.items()
+                                                     if k != 'Event'))
+        else:
+            print 'Unexpected:', dict
 
     def add_action(self, action, parameters, callback=None, stop_event=None,
                    insertpos=None):
@@ -571,7 +576,7 @@ if __name__ == '__main__':
                           disconnect_mode=SequentialAmi.DIS_NEVER)
         # If you have read=all perms in your manager.conf, you'll get flooded
         # with events now :)
-        s.add_action('Events', {'EventMask': 'on'})
+        s.add_action('events', {'EventMask': 'on'})
         s.process()
 
     else:

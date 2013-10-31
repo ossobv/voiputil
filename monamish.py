@@ -296,7 +296,7 @@ if __name__ == '__main__':
         assert False, 'we do not get here'
     elif command == 'originate':
         (channel, context, exten), args = args[0:3], args[3:]
-    elif command == 'reload':
+    elif command in ('listen', 'reload'):
         pass
     elif command == 'queuestatus' or command == 'queuesummary':
         queue_id = args.pop(0)
@@ -333,3 +333,14 @@ if __name__ == '__main__':
     # Not so useful
     elif command == 'queuestatus':
         print fetch_queuestatus(ami_kwargs, queue_id)
+
+    # Listen with one or more AMIs at the same time
+    elif command == 'listen':
+        s = MultiHostSequentialAmi()
+        s.add_action('events', {'EventMask': 'on'})
+        for ami_kwarg in ami_kwargs:
+            s.add_connection(auth='md5', keepalive=10,
+                             disconnect_mode=SequentialAmi.DIS_NEVER,
+                             **ami_kwarg)
+        errors = s.process()
+        print errors  # a list of error tuples [(ami_kwarg, error), ...]
