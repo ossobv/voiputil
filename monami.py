@@ -8,6 +8,7 @@ import select
 import socket
 import sys
 import time
+from hashlib import md5  # for challenge auth
 
 
 class TokenBufferedSocket(object):
@@ -231,7 +232,7 @@ class SequentialAmi(object):
     DIS_IMMEDIATELY = 3  # disconnect when all actions are submitted
 
     def __init__(self, host, port=5038, username='username', secret='secret',
-                 disconnect_mode=DIS_WHEN_DONE):
+                 auth='plain', disconnect_mode=DIS_WHEN_DONE):
         if disconnect_mode not in (self.DIS_NEVER, self.DIS_WHEN_DONE,
                                    self.DIS_IMMEDIATELY):
             raise TypeError("invalid disconnect mode '%'" % (disconnect_mode,))
@@ -248,15 +249,22 @@ class SequentialAmi(object):
         self._action_id_prefix = '%f-' % (time.time(),)  # should be unique-ish
         self._actions = {}
         # Load up login action
-        # TODO: future, use Challenge for salted+hashed passwords
-        self.add_action('login', {
-            'Username': self._username,
-            'Secret': self._secret,
-            # Enable events using the Events-action. You don't need this unless
-            # you're listening for the FullyBooted event which is sent
-            # immediately.
-            'Events': 'off',
-        })
+        if auth == 'md5':
+            self.add_action('challenge', {
+                'AuthType': 'MD5'
+            }, callback=self._on_login_challenge)
+        elif auth == 'plain':
+            self.add_action('login', {
+                #'AuthType': clear-text
+                'Username': self._username,
+                'Secret': self._secret,
+                # Enable events using the Events-action. You don't need this
+                # unless you're listening for the FullyBooted event which is
+                # sent immediately. (See _on_login_challenge() too.)
+                'Events': 'off',
+            })
+        else:
+            raise TypeError('Unknown auth type for host "%s"', auth)
         # Connect immediately
         self._sock.connect(host, port)
 
@@ -300,12 +308,13 @@ class SequentialAmi(object):
         print 'Unexpected:', dict
         pass
 
-    def add_action(self, action, parameters, callback=None, stop_event=None):
+    def add_action(self, action, parameters, callback=None, stop_event=None,
+                   insertpos=None):
         """
         Add an action to fire when the previous action has completed. If you
         supply a custom callback, you don't need to call next_action(). It will
         be done for you. If you supply stop_event, a command will not be marked
-        as completed until a that event has been received.
+        as completed until that event has been received.
         """
         self._action_id += 1
         identifier = self._action_id_prefix + str(self._action_id)
@@ -315,7 +324,11 @@ class SequentialAmi(object):
         self._actions[identifier] = (parameters, callback, stop_event)
         msg = ('\r\n'.join(['%s: %s' % (k, parameters[k]) for k in parameters])
                + '\r\n\r\n')
-        self._outbuf.append(msg)
+
+        if insertpos is None:
+            self._outbuf.append(msg)
+        else:
+            self._outbuf.insert(insertpos, msg)
 
     def next_action(self):
         """
@@ -402,6 +415,18 @@ class SequentialAmi(object):
         self.trace('{{ %r\n' % (dict,))
         self.on_dict(dict)
 
+    def _on_login_challenge(self, response, request):
+        # Add a login action, and prepend it.
+        self.add_action('login', {
+            'AuthType': 'MD5',
+            'Username': self._username,
+            'Key': md5(response['Challenge'] + self._secret).hexdigest(),
+            # Enable events using the Events-action. You don't need this unless
+            # you're listening for the FullyBooted event which is sent
+            # immediately.
+            'Events': 'off',
+        }, insertpos=0)
+
 
 class MultiHostSequentialAmi(object):
     """
@@ -412,7 +437,7 @@ class MultiHostSequentialAmi(object):
     Example usage::
 
         s = MultiHostSequentialAmi()
-        kwargs = {'username': 'username', 'secret': 'secret'}
+        kwargs = {'username': 'username', 'secret': 'secret', 'auth': 'md5'}
         s.add_action('command', {'Command': 'module reload func_odbc'})
         s.add_action('command', {'Command': 'dialplan reload'})
         s.add_action('command', {'Command': 'sip reload'})
@@ -470,14 +495,14 @@ if __name__ == '__main__':
     command, host, username, secret = sys.argv[1:5]
 
     if command == 'reload':
-        s = SequentialAmi(host, username=username, secret=secret)
+        s = SequentialAmi(host, username=username, secret=secret, auth='md5')
         s.add_action('command', {'Command': 'dialplan reload'})
         s.add_action('command', {'Command': 'module reload func_odbc'})
         s.add_action('command', {'Command': 'sip reload'})
         s.process()
 
     elif command == 'listen':
-        s = SequentialAmi(host, username=username, secret=secret,
+        s = SequentialAmi(host, username=username, secret=secret, auth='md5',
                           disconnect_mode=SequentialAmi.DIS_NEVER)
         # If you have read=all perms in your manager.conf, you'll get flooded
         # with events now :)
