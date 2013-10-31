@@ -45,6 +45,8 @@ class TokenBufferedSocket(object):
         self._outbuf = ''
         self._blocksize = 4096
 
+        self._alarm_time = None
+
     def connect(self, host, port, connect_timeout=4):
         """
         Connect to the specified host and port.
@@ -68,6 +70,15 @@ class TokenBufferedSocket(object):
         """
         #sys.stderr.write(message)
         pass
+
+    def alarm(self, seconds, callback):
+        """
+        Add callback after specified time. At the moment, setting a second
+        alarm will overwrite the first.
+        """
+        assert seconds > 0
+        self._alarm_callback = callback
+        self._alarm_time = time.time() + seconds
 
     def loop(self, absolute_timeout=None, relative_timeout=None):
         """
@@ -94,8 +105,13 @@ class TokenBufferedSocket(object):
         Check if there is work to be done and do it.
 
         We use select.select() here instead of poll() or newer candidates
-        because we don't need anything fancy, and select has better support.
+        because we don't need anything fancy, and select is more portable.
         """
+        if self._alarm_time and time.time() > self._alarm_time:
+            callback = self._alarm_callback
+            self._alarm_callback, self._alarm_time = None, None
+            callback()
+
         if not self._sock:
             return None
 
@@ -242,7 +258,7 @@ class SequentialAmi(object):
     DIS_IMMEDIATELY = 3  # disconnect when all actions are submitted
 
     def __init__(self, host, port=5038, username='username', secret='secret',
-                 auth='plain', disconnect_mode=DIS_WHEN_DONE):
+                 auth='plain', keepalive=None, disconnect_mode=DIS_WHEN_DONE):
         if disconnect_mode not in (self.DIS_NEVER, self.DIS_WHEN_DONE,
                                    self.DIS_IMMEDIATELY):
             raise TypeError("invalid disconnect mode '%'" % (disconnect_mode,))
@@ -272,11 +288,15 @@ class SequentialAmi(object):
                 # unless you're listening for the FullyBooted event which is
                 # sent immediately. (See _on_login_challenge() too.)
                 'Events': 'off',
-            })
+            }, callback=self._on_login_response)
         else:
             raise TypeError('Unknown auth type for host "%s"', auth)
         # Connect immediately
         self._sock.connect(host, port)
+        # Schedule a new ping.
+        self._keepalive = 5  # login timeout being this + ping timeout
+        self._user_keepalive = keepalive
+        self._keepalive_on_pong(None, None)
 
     def trace(self, message):
         """
@@ -428,6 +448,7 @@ class SequentialAmi(object):
         self.trace('{{ %r\n' % (dict,))
         self.on_dict(dict)
 
+    # Challenge login handling
     def _on_login_challenge(self, response, request):
         # Add a login action, and prepend it.
         self.add_action('login', {
@@ -438,7 +459,39 @@ class SequentialAmi(object):
             # you're listening for the FullyBooted event which is sent
             # immediately.
             'Events': 'off',
-        }, insertpos=0)
+        }, callback=self._on_login_response, insertpos=0)
+
+    def _on_login_response(self, response, request):
+        print request
+        print response
+        # Set the regular keepalive time instead of the during-login keepalive
+        # time.
+        self._keepalive = self._user_keepalive
+
+    # Keepalive handling
+    def _keepalive_ping(self):
+        # Enqueue a ping as first next action.
+        self.add_action('ping', {
+        }, callback=self._keepalive_on_pong, insertpos=0)
+        # Set a new alarm for it. Wait 5 seconds for the pong.
+        # OBSERVE: these hardcoded 5 seconds will cause the minimum
+        # ping keepalive to be at least 5, since the next alarm will
+        # be scheduled first on pong_alarm.
+        self._sock.alarm(5, self._keepalive_pong_alarm)
+        # Force the ping to go out immediately.
+        self.next_action()
+
+    def _keepalive_on_pong(self, response, request):
+        # Re-schedule the ping. Discard the _keepalive_pong_alarm.
+        if self._keepalive:
+            # Only if _keepalive. Now we can alter the keepalive time
+            # during the running of the program.
+            self._sock.alarm(self._keepalive, self._keepalive_ping)
+
+    def _keepalive_pong_alarm(self):
+        # Connection broken? Tear it down and raise an exception.
+        self._sock.abort()
+        raise MonAmiTimeout('Ping timeout')
 
 
 class MultiHostSequentialAmi(object):
@@ -516,6 +569,7 @@ if __name__ == '__main__':
 
     elif command == 'listen':
         s = SequentialAmi(host, username=username, secret=secret, auth='md5',
+                          keepalive=60,
                           disconnect_mode=SequentialAmi.DIS_NEVER)
         # If you have read=all perms in your manager.conf, you'll get flooded
         # with events now :)
