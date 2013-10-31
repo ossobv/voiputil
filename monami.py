@@ -96,6 +96,9 @@ class TokenBufferedSocket(object):
         We use select.select() here instead of poll() or newer candidates
         because we don't need anything fancy, and select has better support.
         """
+        if not self._sock:
+            return None
+
         rlist, wlist, timeout = [self._sock], [], self._timeout
         if self._outbuf:
             wlist.append(self._sock)
@@ -214,6 +217,13 @@ class MonAmiFinished(MonAmiException):
     Raised from work() when disconnect_mode is not DIS_NEVER and we're done.
 
     XXX: should we inherit from StopIteration?
+    """
+    pass
+
+
+class MonAmiReset(MonAmiException):
+    """
+    Raised when the connection got terminated by the peer.
     """
     pass
 
@@ -363,7 +373,8 @@ class SequentialAmi(object):
             # First log in.. first then go to infinite loop mode
             # (work() takes 0.333 seconds per run if no data is received)
             for i in range(10):
-                self._sock.work()
+                if self._sock.work() is None:
+                    raise MonAmiReset('Connection broken')
             if self._first:
                 raise MonAmiError('No timely welcome message')
             self._sock.loop()
@@ -371,6 +382,8 @@ class SequentialAmi(object):
     def work(self):
         # Manual work, if you're combining multiple instances
         ret = self._sock.work()
+        if ret is None:
+            raise MonAmiReset('Connection broken')
         self._iterations += 1
         if self._first and self._iterations == 10:
             raise MonAmiError('No timely welcome message')
