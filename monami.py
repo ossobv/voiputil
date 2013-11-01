@@ -493,8 +493,7 @@ class SequentialAmi(object):
 
     def _keepalive_pong_alarm(self):
         # Connection broken? Tear it down and raise an exception.
-        self._sock.abort()
-        raise MonAmiTimeout('Ping timeout')
+        self._sock.abort(MonAmiTimeout('Ping timeout'))
 
 
 class MultiHostSequentialAmi(object):
