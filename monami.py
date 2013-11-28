@@ -224,7 +224,15 @@ class MonAmiActionFailed(MonAmiException):
     pass
 
 
-class MonAmiError(MonAmiException):
+class MonAmiConnectFailed(MonAmiException):
+    """
+    Raised when connect raised an error. Only raised from SequentialAmi
+    __init__().
+    """
+    pass
+
+
+class MonAmiError(MonAmiException):  # FIXME: rename to "data" or "protocol" error?
     pass
 
 
@@ -232,7 +240,7 @@ class MonAmiFinished(MonAmiException):
     """
     Raised from work() when disconnect_mode is not DIS_NEVER and we're done.
 
-    XXX: should we inherit from StopIteration?
+    XXX: should we inherit from EOFError or StopIteration instead?
     """
     pass
 
@@ -265,6 +273,7 @@ class SequentialAmi(object):
         self._username = username
         self._secret = secret
         self._disconnect_mode = disconnect_mode
+
         # Privates
         self._sock = TokenBufferedSocket(token='\r\n', on_data=self._on_line)
         self._first = True
@@ -278,6 +287,7 @@ class SequentialAmi(object):
         # on them, you need to check if we're authenticated first. Otherwise
         # we'd start sending login messages out of order.
         self._is_authenticated = False
+
         # Load up login action
         if auth == 'md5':
             self.add_action('challenge', {
@@ -295,8 +305,16 @@ class SequentialAmi(object):
             }, callback=self._on_login_response)
         else:
             raise TypeError('Unknown auth type for host "%s"', auth)
+
         # Connect immediately
-        self._sock.connect(host, port)
+        try:
+            self._sock.connect(host, port)
+        except Exception, e:
+            # Re-raise with the original stack frame but a slightly altered
+            # exception.
+            raise MonAmiConnectFailed, 'connecting to %s: %s' % (host, e), \
+                sys.exc_info()[2]
+
         # Schedule a new ping.
         self._keepalive = 5  # login timeout being this + ping timeout
         self._user_keepalive = keepalive
