@@ -274,6 +274,10 @@ class SequentialAmi(object):
         self._action_id = 0
         self._action_id_prefix = '%f-' % (time.time(),)  # should be unique-ish
         self._actions = {}
+        # If you're going to add events asynchronously and calling next_action
+        # on them, you need to check if we're authenticated first. Otherwise
+        # we'd start sending login messages out of order.
+        self._is_authenticated = False
         # Load up login action
         if auth == 'md5':
             self.add_action('challenge', {
@@ -297,6 +301,35 @@ class SequentialAmi(object):
         self._keepalive = 5  # login timeout being this + ping timeout
         self._user_keepalive = keepalive
         self._keepalive_on_pong(None, None)
+
+    def is_authenticated(self):
+        """
+        Returns True if we've authenticated.
+
+        Use this check if you're using the sequentialami in a non-sequential
+        fashion: i.e. adding events before waiting for older results.
+
+        Example usage::
+
+            s = SequentialAmi(host)
+
+            # Ensure that login work is completed first.
+            while not s.is_authenticated():
+                s.work()
+
+            while True:
+                # Asynchronous adding of requests.
+                queue_id = queue_id_info_to_fetch()
+                if queue_id:
+                    s.add_action('QueueSummary', {'Queue': queue_id},
+                                 callback=on_queue_response,
+                                 stop_event='QueueSummaryComplete')
+                    s.next_action()
+
+                # Do a bit of work.
+                s.work()
+        """
+        return self._is_authenticated
 
     def trace(self, message):
         """
@@ -467,6 +500,8 @@ class SequentialAmi(object):
         }, callback=self._on_login_response, insertpos=0)
 
     def _on_login_response(self, response, request):
+        # Set flag that we're logged in.
+        self._is_authenticated = True
         # Set the regular keepalive time instead of the during-login keepalive
         # time.
         self._keepalive = self._user_keepalive
