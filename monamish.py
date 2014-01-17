@@ -49,6 +49,32 @@ def channel_originate(ami_kwarg, channel, params=None):
     s.process()
 
 
+def cli_asterisken(ami_kwargs, command):
+    """
+    Provide a CLI command directly. Potentially dangerous!
+
+    Example command: 'dialplan reload' or 'sip show peers'
+    Returns: (list of output tuples, list of error tuples)
+    """
+    data = []
+
+    def callback(dict, input):
+        # DRAT! We don't get *any* identification about which host this
+        # is. Should we alter monami to pass the host to the callback
+        # as well? Or the MultiHostSequentialAmi to wrap our callback
+        # with one that passed the amiaddr too.
+        data.append(dict.get('', '(void)'))
+
+    s = MultiHostSequentialAmi()
+    s.add_action('Command', {'Command': command}, callback)
+    for ami_kwarg in ami_kwargs:
+        s.add_connection(**ami_kwarg)
+
+    errors = s.process()
+    return (data,    # a list of outputs ['...', '...']
+            errors)  # a list of error tuples [(ami_kwarg, error), ...]
+
+
 def reload_asterisken(ami_kwargs):
     """
     Reload the asterisk config (extensions, func_odbc, sip). Returns the
