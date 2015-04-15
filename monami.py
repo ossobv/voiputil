@@ -68,7 +68,7 @@ class TokenBufferedSocket(object):
         """
         A way to debug this.
         """
-        #sys.stderr.write(message)
+        # sys.stderr.write(message)
         pass
 
     def alarm(self, seconds, callback):
@@ -232,7 +232,8 @@ class MonAmiConnectFailed(MonAmiException):
     pass
 
 
-class MonAmiError(MonAmiException):  # FIXME: rename to "data" or "protocol" error?
+# FIXME: rename to "data" or "protocol" error?
+class MonAmiError(MonAmiException):
     pass
 
 
@@ -295,7 +296,7 @@ class SequentialAmi(object):
             }, callback=self._on_login_challenge)
         elif auth == 'plain':
             self.add_action('login', {
-                #'AuthType': clear-text
+                # #'AuthType': clear-text
                 'Username': self._username,
                 'Secret': self._secret,
                 # Enable events using the Events-action. You don't need this
@@ -353,7 +354,7 @@ class SequentialAmi(object):
         """
         A way to debug this.
         """
-        #sys.stderr.write(message)
+        # sys.stderr.write(message)
         pass
 
     def on_dict(self, dict):
@@ -365,7 +366,7 @@ class SequentialAmi(object):
             self.on_response(dict, action[0], action[1], action[2])
 
     def on_response(self, dict, input, callback=None, stop_event=None):
-        #print 'Response:', dict, 'to', input
+        # print 'Response:', dict, 'to', input
         event = dict.get('Event')
         response = dict.get('Response')
         if not event and response not in ('Success', 'Follows'):
@@ -472,7 +473,7 @@ class SequentialAmi(object):
             # Asterisk 1.6.2 says: Asterisk Call Manager/1.1
             # Asterisk 10.3 says: Asterisk Call Manager/1.2
             if (not data.startswith('Asterisk Call Manager/') or
-                not data.endswith('\r\n')):
+                    not data.endswith('\r\n')):
                 raise MonAmiError('Unexpected welcome message', data)
             self._first = False
             # Load up the login action
@@ -495,8 +496,8 @@ class SequentialAmi(object):
     def _on_raw_dict(self, raw_dict):
         dict = {}
         for i, line in enumerate(raw_dict):
-            if (line.endswith('--END COMMAND--\r\n')
-                and dict.get('Response') == 'Follows'):
+            if (line.endswith('--END COMMAND--\r\n') and
+                    dict.get('Response') == 'Follows'):
                 dict[''] = line[0:-17]  # drop '--END COMMAND--\r\n'
             else:
                 key, value = line.split(':', 1)
@@ -609,9 +610,9 @@ class MultiHostSequentialAmi(object):
 
 
 if __name__ == '__main__':
-    #s = TokenBufferedSocket()
-    #s.connect('server1', 5038)
-    #s.loop(relative_timeout=3, absolute_timeout=2)
+    # s = TokenBufferedSocket()
+    # s.connect('server1', 5038)
+    # s.loop(relative_timeout=3, absolute_timeout=2)
 
     command, host, username, secret = sys.argv[1:5]
 
@@ -632,11 +633,11 @@ if __name__ == '__main__':
         s.process()
 
     else:
-        #s.add_action('originate', {
-        #    'Action': 'Originate',
-        #    'Channel': channel,
-        #    'Context': context,
-        #    'Exten': exten,
-        #    'Priority': 1,
-        #}, on_result)
+        # s.add_action('originate', {
+        #     'Action': 'Originate',
+        #     'Channel': channel,
+        #     'Context': context,
+        #     'Exten': exten,
+        #     'Priority': 1,
+        # }, on_result)
         raise ValueError('Use the source, Luke')

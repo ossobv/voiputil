@@ -41,7 +41,7 @@ def channel_originate(ami_kwarg, channel, params=None):
     params['Channel'] = channel
 
     s = SequentialAmi(disconnect_mode=SequentialAmi.DIS_IMMEDIATELY,
-                     **ami_kwarg)
+                      **ami_kwarg)
     s.add_action('Originate', params)
     # This can raise a bunchof socket.* errors, or a bunch of MonAmiExceptions.
     # If it doesn't, the call probably went ok. (But due to the
@@ -239,44 +239,43 @@ if __name__ == '__main__':
                 ({'ServicelevelPerf': '0.0', 'TalkTime': '0', 'Calls': '0',
                   'Max': '12', 'Completed': '0', 'ServiceLevel': '0',
                   'Strategy': 'random', 'Queue': '22', 'Weight': '0',
-                  'ActionID': '1333717971.398761-3', 'Holdtime': '0', 'Event':
-                  'QueueParams', 'Abandoned': '1'}, {'Queue': '22', 'Action':
-                  'QueueStatus', 'ActionID': '1333717971.398761-3'}),
+                  'ActionID': '1333717971.398761-3', 'Holdtime': '0',
+                  'Event': 'QueueParams', 'Abandoned': '1'}, {'Queue': '22',
+                 'Action': 'QueueStatus', 'ActionID': '1333717971.398761-3'}),
                 ({'Status': '1', 'Penalty': '0', 'Name':
                   'Local/ID22@route_phoneaccount', 'Queue': '22',
                   'Membership': 'static', 'Location':
                   'Local/ID22@route_phoneaccount', 'LastCall': '0',
                   'Paused': '0', 'Event': 'QueueMember', 'CallsTaken': '0',
-                  'ActionID': '1333717971.398761-3'}, {'Queue':
-                  '22', 'Action': 'QueueStatus', 'ActionID':
-                  '1333717971.398761-3'}),
+                  'ActionID': '1333717971.398761-3'}, {'Queue': '22',
+                 'Action': 'QueueStatus', 'ActionID': '1333717971.398761-3'}),
                 ({'Status': '1', 'Penalty': '0', 'Name':
                   'Local/ID22@route_phoneaccount', 'Queue': '22',
                   'Membership': 'static', 'Location':
                   'Local/ID22@route_phoneaccount', 'LastCall': '0',
                   'Paused': '0', 'Event': 'QueueMember', 'CallsTaken': '0',
-                  'ActionID': '1333717971.396309-3'}, {'Queue': '22', 'Action':
-                  'QueueStatus', 'ActionID': '1333717971.398761-3'}),
+                  'ActionID': '1333717971.396309-3'}, {'Queue': '22',
+                 'Action': 'QueueStatus', 'ActionID': '1333717971.398761-3'}),
                 ({'Status': '1', 'Penalty': '0', 'Name':
                   'Local/ID12@route_phoneaccount', 'Queue': '22',
                   'Membership': 'static', 'Location':
                   'Local/ID12@route_phoneaccount', 'LastCall': '0',
                   'Paused': '0', 'Event': 'QueueMember', 'CallsTaken': '0',
-                  'ActionID': '1333717971.396309-3'}, {'Queue': '22', 'Action':
-                  'QueueStatus', 'ActionID': '1333717971.398761-3'}),
+                  'ActionID': '1333717971.396309-3'}, {'Queue': '22',
+                 'Action': 'QueueStatus', 'ActionID': '1333717971.398761-3'}),
                 ({'Event': 'QueueStatusComplete', 'ActionID':
-                  '1333717971.396309-3'}, {'Queue': '22', 'Action':
-                  'QueueStatus', 'ActionID': '1333717971.398761-3'}),
+                  '1333717971.396309-3'}, {'Queue': '22',
+                 'Action': 'QueueStatus', 'ActionID': '1333717971.398761-3'}),
                 ({'Status': '1', 'Penalty': '0', 'Name':
                   'Local/ID12@route_phoneaccount', 'Queue': '22',
                   'Membership': 'static', 'Location':
                   'Local/ID12@route_phoneaccount', 'LastCall': '0',
                   'Paused': '0', 'Event': 'QueueMember', 'CallsTaken': '0',
-                  'ActionID': '1333717971.398761-3'}, {'Queue': '22', 'Action':
-                  'QueueStatus', 'ActionID': '1333717971.398761-3'}),
+                  'ActionID': '1333717971.398761-3'}, {'Queue': '22',
+                 'Action': 'QueueStatus', 'ActionID': '1333717971.398761-3'}),
                 ({'Event': 'QueueStatusComplete', 'ActionID':
-                  '1333717971.398761-3'}, {'Queue': '22', 'Action':
-                  'QueueStatus', 'ActionID': '1333717971.398761-3'}),
+                  '1333717971.398761-3'}, {'Queue': '22',
+                 'Action': 'QueueStatus', 'ActionID': '1333717971.398761-3'}),
             ]
             output = translate_queuestatus(queue_data)
             expected = {'completed': 32, 'holdtime': 33, 'abandoned': 35,
@@ -286,29 +285,29 @@ if __name__ == '__main__':
         def test_translate_queuesummary(self):
             queue_data = [
                 ({'Message': 'Queue summary will follow', 'Response':
-                  'Success', 'ActionID': '1334760883.002422-3'}, {'Queue':
-                  '22', 'Action': 'QueueSummary', 'ActionID':
+                  'Success', 'ActionID': '1334760883.002422-3'},
+                 {'Queue': '22', 'Action': 'QueueSummary', 'ActionID':
                   '1334760883.002422-3'}),
                 ({'Available': '2', 'LoggedIn': '5', 'TalkTime': '8',
                   'LongestHoldTime': '55', 'Queue': '22', 'Callers': '2',
                   'ActionID': '1334760883.002422-3', 'HoldTime': '33', 'Event':
                   'QueueSummary'}, {'Queue': '22', 'Action': 'QueueSummary',
-                  'ActionID': '1334760883.002422-3'}),
+                 'ActionID': '1334760883.002422-3'}),
                 ({'Event': 'QueueSummaryComplete', 'ActionID':
-                  '1334760883.002422-3'}, {'Queue': '22', 'Action':
-                  'QueueSummary', 'ActionID': '1334760883.002422-3'}),
+                  '1334760883.002422-3'}, {'Queue': '22',
+                 'Action': 'QueueSummary', 'ActionID': '1334760883.002422-3'}),
                 ({'Message': 'Queue summary will follow', 'Response':
-                  'Success', 'ActionID': '1334760883.002422-4'}, {'Queue':
-                  '22', 'Action': 'QueueSummary', 'ActionID':
-                  '1334760883.002422-4'}),
+                  'Success', 'ActionID': '1334760883.002422-4'},
+                 {'Queue': '22', 'Action': 'QueueSummary',
+                  'ActionID': '1334760883.002422-4'}),
                 ({'Available': '2', 'LoggedIn': '5', 'TalkTime': '8',
                   'LongestHoldTime': '0', 'Queue': '22', 'Callers': '0',
                   'ActionID': '1334760883.002422-4', 'HoldTime': '0', 'Event':
                   'QueueSummary'}, {'Queue': '22', 'Action': 'QueueSummary',
-                  'ActionID': '1334760883.002422-4'}),
+                 'ActionID': '1334760883.002422-4'}),
                 ({'Event': 'QueueSummaryComplete', 'ActionID':
-                  '1334760883.002422-4'}, {'Queue': '22', 'Action':
-                  'QueueSummary', 'ActionID': '1334760883.002422-4'}),
+                  '1334760883.002422-4'}, {'Queue': '22',
+                 'Action': 'QueueSummary', 'ActionID': '1334760883.002422-4'}),
             ]
             output = translate_queuesummary(queue_data)
             expected = {'average_holdtime': 33, 'average_talktime': 16,
