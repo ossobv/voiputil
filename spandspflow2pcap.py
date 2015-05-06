@@ -48,22 +48,27 @@ class FaxPcap(object):
         self.outfile.write(self.PCAP_PREAMBLE)
 
     def data2packet(self, date, udpseqno, seqno, data, prev_data):
-        sum16 = '\x43\x21'  # checksum is irrelevant for sipp sending
+        kwargs = {
+            'sum16': '\x00\x00',  # checksum is irrelevant for sipp sending
+            'udpseqno': pack('>H', udpseqno),
+            'sourceip': '\x01\x01\x01\x01',     # 1.1.1.1
+            'sourceport': '\x00\x01',           # 1
+            'destip': '\x02\x02\x02\x02',       # 2.2.2.2
+            'destport': '\x00\x02',             # 2
+        }
 
         data = '%s%s' % (pack('>H', seqno), data)
         new_prev = data
         data += prev_data
 
-        kwargs = {'udpseqno': pack('>H', udpseqno), 'sum16': sum16}
-
         kwargs['data'] = data
         kwargs['lenb16'] = pack('>H', len(kwargs['data']) + 8)
-        udp = '\x40\x60\x5f\xaa%(lenb16)s%(sum16)s%(data)s' % kwargs
+        udp = '%(sourceport)s%(destport)s%(lenb16)s%(sum16)s%(data)s' % kwargs
 
         kwargs['data'] = udp
         kwargs['lenb16'] = pack('>H', len(kwargs['data']) + 20)
-        ip = ('\x45\xb8%(lenb16)s%(udpseqno)s\x00\x00\xf9\x11%(sum16)s\x5b'
-              '\xc2\xe1\x04\x5b\xc2\xe1\x67%(data)s') % kwargs
+        ip = ('\x45\xb8%(lenb16)s%(udpseqno)s\x00\x00\xf9\x11%(sum16)s'
+              '%(sourceip)s%(destip)s%(data)s') % kwargs
 
         kwargs['data'] = ip
         frame = ('\x00\x00\x00\x01\x00\x06\x00\x30\x48\xb1\x1c\x34\x00\x00'
@@ -140,8 +145,8 @@ with open(sys.argv[1], 'r') as infile:
     with open(sys.argv[2], 'wb') as outfile:
         first = True
         p = FaxPcap(outfile)
-        #p.add(datetime.now(), 0, n2b('06'))
-        #p.add(datetime.now(), 1, n2b('c0 01 80 00 00 ff'))
+        # p.add(datetime.now(), 0, n2b('06'))
+        # p.add(datetime.now(), 1, n2b('c0 01 80 00 00 ff'))
 
         for lineno, line in enumerate(infile):
             # Look for lines like:
