@@ -47,9 +47,19 @@ class FaxPcap(object):
         # Only do this if at pos 0?
         self.outfile.write(self.PCAP_PREAMBLE)
 
+    def checksum(self, data):
+        total = 0
+        for high, low in zip(*([iter(data + '\x00')] * 2)):
+            total += (ord(high) << 8) | ord(low)
+        while total > 0xffff:
+            total = (total & 0xffff) + (total >> 16)
+        ret = ~total & 0xffff
+        if not ret:
+            return 0xffff
+        return ret
+
     def data2packet(self, date, udpseqno, seqno, data, prev_data):
         kwargs = {
-            'sum16': '\x00\x00',  # checksum is irrelevant for sipp sending
             'udpseqno': pack('>H', udpseqno),
             'sourceip': '\x01\x01\x01\x01',     # 1.1.1.1
             'sourceport': '\x00\x01',           # 1
@@ -62,13 +72,23 @@ class FaxPcap(object):
         data += prev_data
 
         kwargs['data'] = data
-        kwargs['lenb16'] = pack('>H', len(kwargs['data']) + 8)
-        udp = '%(sourceport)s%(destport)s%(lenb16)s%(sum16)s%(data)s' % kwargs
+        kwargs['udplenb16'] = pack('>H', len(kwargs['data']) + 8)
+
+        pseudo = ('%(sourceip)s%(destip)s\x00\x11%(udplenb16)s'
+                  '%(sourceport)s%(destport)s%(udplenb16)s\x00\x00' %
+                  kwargs)
+        udpsum = self.checksum(pseudo + data)
+
+        kwargs['udpsum16'] = pack('>H', udpsum)
+        udp = ('%(sourceport)s%(destport)s%(udplenb16)s%(udpsum16)s%(data)s' %
+               kwargs)
 
         kwargs['data'] = udp
-        kwargs['lenb16'] = pack('>H', len(kwargs['data']) + 20)
-        ip = ('\x45\xb8%(lenb16)s%(udpseqno)s\x00\x00\xf9\x11%(sum16)s'
+        kwargs['iplenb16'] = pack('>H', len(kwargs['data']) + 20)
+        ip = ('\x45\xb8%(iplenb16)s%(udpseqno)s\x00\x00\xf9\x11\x00\x00'
               '%(sourceip)s%(destip)s%(data)s') % kwargs
+        ipsum = self.checksum(ip[0:20])
+        ip = ip[0:10] + pack('>H', ipsum) + ip[12:]  # ipsum16
 
         kwargs['data'] = ip
         frame = ('\x00\x00\x00\x01\x00\x06\x00\x30\x48\xb1\x1c\x34\x00\x00'
