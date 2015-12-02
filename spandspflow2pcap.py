@@ -27,6 +27,10 @@ from struct import pack
 import sys
 
 
+LOSSY = False
+EMPTY_RECOVERY = False
+
+
 def n2b(text):
     return b16decode(text.replace(' ', '').replace('\n', '').upper())
 
@@ -40,55 +44,41 @@ class FaxPcap(object):
         self.outfile = outfile
         self.date = None
         self.dateoff = timedelta(seconds=0)
-        self.seqno = 0
+        self.seqno = None
         self.udpseqno = 128
-        self.prev_data = n2b('0000 0000')  # sequence 0, no data
+        self.prev_data = None
 
         # Only do this if at pos 0?
         self.outfile.write(self.PCAP_PREAMBLE)
 
-    def checksum(self, data):
-        total = 0
-        for high, low in zip(*([iter(data + '\x00')] * 2)):
-            total += (ord(high) << 8) | ord(low)
-        while total > 0xffff:
-            total = (total & 0xffff) + (total >> 16)
-        ret = ~total & 0xffff
-        if not ret:
-            return 0xffff
-        return ret
-
     def data2packet(self, date, udpseqno, seqno, data, prev_data):
-        kwargs = {
-            'udpseqno': pack('>H', udpseqno),
-            'sourceip': '\x01\x01\x01\x01',     # 1.1.1.1
-            'sourceport': '\x00\x01',           # 1
-            'destip': '\x02\x02\x02\x02',       # 2.2.2.2
-            'destport': '\x00\x02',             # 2
-        }
+        sum16 = '\x43\x21'  # checksum is irrelevant for sipp sending
 
+        new_prev = data  # without seqno..
         data = '%s%s' % (pack('>H', seqno), data)
-        new_prev = data
-        data += prev_data
+        if prev_data:
+            if LOSSY and (seqno % 3) == 2:
+                return '', new_prev
+            if EMPTY_RECOVERY:
+                # struct ast_frame f[16], we have room for a few
+                # packets.
+                packets = 14
+                data += '\x00%c%s%s' % (
+                    chr(packets + 1), '\x00' * packets, prev_data)
+            else:
+                # Add 1 previous packet, without the seqno.
+                data += '\x00\x01' + prev_data
+
+        kwargs = {'udpseqno': pack('>H', udpseqno), 'sum16': sum16}
 
         kwargs['data'] = data
-        kwargs['udplenb16'] = pack('>H', len(kwargs['data']) + 8)
-
-        pseudo = ('%(sourceip)s%(destip)s\x00\x11%(udplenb16)s'
-                  '%(sourceport)s%(destport)s%(udplenb16)s\x00\x00' %
-                  kwargs)
-        udpsum = self.checksum(pseudo + data)
-
-        kwargs['udpsum16'] = pack('>H', udpsum)
-        udp = ('%(sourceport)s%(destport)s%(udplenb16)s%(udpsum16)s%(data)s' %
-               kwargs)
+        kwargs['lenb16'] = pack('>H', len(kwargs['data']) + 8)
+        udp = '\x00\x01\x00\x02%(lenb16)s%(sum16)s%(data)s' % kwargs
 
         kwargs['data'] = udp
-        kwargs['iplenb16'] = pack('>H', len(kwargs['data']) + 20)
-        ip = ('\x45\xb8%(iplenb16)s%(udpseqno)s\x00\x00\xf9\x11\x00\x00'
-              '%(sourceip)s%(destip)s%(data)s') % kwargs
-        ipsum = self.checksum(ip[0:20])
-        ip = ip[0:10] + pack('>H', ipsum) + ip[12:]  # ipsum16
+        kwargs['lenb16'] = pack('>H', len(kwargs['data']) + 20)
+        ip = ('\x45\xb8%(lenb16)s%(udpseqno)s\x00\x00\xf9\x11%(sum16)s\x01'
+              '\x01\x01\x01\x02\x02\x02\x02%(data)s') % kwargs
 
         kwargs['data'] = ip
         frame = ('\x00\x00\x00\x01\x00\x06\x00\x30\x48\xb1\x1c\x34\x00\x00'
@@ -104,29 +94,25 @@ class FaxPcap(object):
         return (packet, new_prev)
 
     def add(self, date, seqno, data):
+        if self.seqno is None:
+            self.seqno = 0
+            for i in range(seqno):
+                # In case the first zeroes were dropped, add them.
+                self.add(date, i, '\x00')
         assert seqno == self.seqno, '%s != %s' % (seqno, self.seqno)
 
-        # Data is prepended by len(data)
+        # Data is prepended by len(data).
         data = chr(len(data)) + data
 
         # Auto-increasing dates
         if self.date is None or date > self.date:
-            print 'date is larger', date, self.date
+            # print 'date is larger', date, self.date
             self.date = date
         elif (date < self.date.replace(microsecond=0)):
             assert False, ('We increased too fast.. decrease delta: %r/%r' %
                            (date, self.date))
         else:
             self.date += timedelta(microseconds=9000)
-
-#        if seqno == 0:
-#            self.dateoff += timedelta(seconds=1)
-#        if seqno == 1078:
-#            self.dateoff += timedelta(seconds=1)
-#        elif seqno == 1079:
-#            self.dateoff += timedelta(seconds=2)
-#        elif seqno == 1083:
-#            self.dateoff += timedelta(seconds=2)
 
         print seqno, '\t', self.date + self.dateoff
 
@@ -136,16 +122,7 @@ class FaxPcap(object):
                                              data, self.prev_data)
         self.outfile.write(packet)
 
-        if False:
-            # Send it again.
-            self.date += timedelta(microseconds=9000)
-            self.udpseqno += 1
-            packet = self.data2packet(self.date + self.dateoff,
-                                      self.udpseqno, self.seqno, data,
-                                      self.prev_data)
-            self.outfile.write(packet)
-
-        # Increase values
+        # Increase values.
         self.udpseqno += 1
         self.seqno += 1
         self.prev_data = prev_data
@@ -195,4 +172,21 @@ with open(sys.argv[1], 'r') as infile:
                 first = False
 
             # Add the packets.
+            #
+            # T.38 basic format of UDPTL payload section with redundancy:
+            #
+            # UDPTL_SEQNO
+            # - 2 sequence number (big endian)
+            # UDPTL_PRIMARY_PAYLOAD (T30?)
+            # - 1 subpacket length (excluding this byte)
+            # - 1 type of message (e.g. 0xd0 for data(?))
+            # - 1 items in data field (e.g. 0x01)
+            # - 2 length of data (big endian)
+            # - N data
+            # RECOVERY (optional)
+            # - 2 count of previous seqno packets (big endian)
+            # - N UDPTL_PRIMARY_PAYLOAD of (seqno-1)
+            # - N UDPTL_PRIMARY_PAYLOAD of (seqno-2)
+            # - ...
+            #
             p.add(date, seqno, data)
