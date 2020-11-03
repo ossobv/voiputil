@@ -178,7 +178,7 @@ class TokenBufferedSocket(object):
     def _read(self):
         try:
             ret = self._sock.recv(self._blocksize)
-        except socket.error, e:
+        except socket.error as e:
             # Connection reset by peer?
             self.trace('|| Recv yielded: %s\n' % (e,))
             self.abort(e)
@@ -201,7 +201,7 @@ class TokenBufferedSocket(object):
             self.trace('>> %r (%d)\n' % (bytes_to_write, size_to_write))
             try:
                 ret = self._sock.send(bytes_to_write)
-            except socket.error, e:
+            except socket.error as e:
                 # Connection reset by peer?
                 self.trace('|| Recv yielded: %s\n' % (e,))
                 self.abort()  # empties _outbuf so we exit the while
@@ -270,7 +270,7 @@ class SequentialAmi(object):
                  auth='plain', keepalive=None, disconnect_mode=DIS_WHEN_DONE):
         if disconnect_mode not in (self.DIS_NEVER, self.DIS_WHEN_DONE,
                                    self.DIS_IMMEDIATELY):
-            raise TypeError("invalid disconnect mode '%'" % (disconnect_mode,))
+            raise TypeError("invalid disconnect mode %r" % (disconnect_mode,))
         self._username = username
         self._secret = secret
         self._disconnect_mode = disconnect_mode
@@ -310,11 +310,11 @@ class SequentialAmi(object):
         # Connect immediately
         try:
             self._sock.connect(host, port)
-        except Exception, e:
+        except Exception as e:
             # Re-raise with the original stack frame but a slightly altered
             # exception.
-            raise MonAmiConnectFailed, 'connecting to %s: %s' % (host, e), \
-                sys.exc_info()[2]
+            raise MonAmiConnectFailed(
+                'connecting to %s: %s' % (host, e)) from e
 
         # Schedule a new ping.
         self._keepalive = 5  # login timeout being this + ping timeout
@@ -388,12 +388,12 @@ class SequentialAmi(object):
         requested action by ActionID.
         """
         if dict.get('Event'):
-            print 'Got event: %s\n%s\n' % (dict['Event'],
+            print('Got event: %s\n%s\n' % (dict['Event'],
                                            '\n'.join('  %s\t%r' % (k, v)
                                                      for k, v in dict.items()
-                                                     if k != 'Event'))
+                                                     if k != 'Event')))
         else:
-            print 'Unexpected:', dict
+            print('Unexpected:', dict)
 
     def add_action(self, action, parameters, callback=None, stop_event=None,
                    insertpos=None):
@@ -584,7 +584,7 @@ class MultiHostSequentialAmi(object):
     def add_connection(self, **kwargs):
         try:
             s = SequentialAmi(**kwargs)
-        except Exception, e:
+        except Exception as e:
             self._errors.append((kwargs, e))
         else:
             self._amis.append((kwargs, s))
@@ -602,14 +602,14 @@ class MultiHostSequentialAmi(object):
                     ami.work()
                 except MonAmiFinished:
                     self._amis.pop(self._amis.index((kwargs, ami)))  # drop it
-                except Exception, e:
+                except Exception as e:
                     self._errors.append((kwargs, e))
                     self._amis.pop(self._amis.index((kwargs, ami)))  # drop it
 
         return self._errors
 
 
-if __name__ == '__main__':
+def main():
     # s = TokenBufferedSocket()
     # s.connect('server1', 5038)
     # s.loop(relative_timeout=3, absolute_timeout=2)
@@ -641,3 +641,7 @@ if __name__ == '__main__':
         #     'Priority': 1,
         # }, on_result)
         raise ValueError('Use the source, Luke')
+
+
+if __name__ == '__main__':
+    main()

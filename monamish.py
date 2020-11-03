@@ -3,8 +3,13 @@
 '''
 FIXME/XXX: Shortcuts for monami. Document me.
 '''
+import sys
+
 from collections import defaultdict
-from urlparse import urlparse
+try:
+    from urllib.parse import urlparse
+except ImportError:
+    from urlparse import urlparse
 
 # Local friend package.
 from monami import MultiHostSequentialAmi, SequentialAmi
@@ -17,7 +22,6 @@ def amiaddr_to_dict(address):
     {'host': 'hostname, 'port': 5038, 'username': 'myuser', 'secret': 'mypass'}
     """
     # Cheat, and prepend http:// so we can use urlparse
-    address = address.decode('utf-8')
     info = urlparse('http://%s' % (address,))
     ret = {
         'host': info.hostname or 'localhost',
@@ -196,130 +200,10 @@ def translate_queuesummary(queue_data):
     return ret
 
 
-if __name__ == '__main__':
-    import unittest
-    import sys
-
-    class TestCase(unittest.TestCase):
-        def test_amiaddr_to_dict_default(self):
-            self.assertEquals(
-                amiaddr_to_dict(''),
-                {'host': 'localhost', 'port': 5038,
-                 'username': 'username', 'secret': 'secret'}
-            )
-
-        def test_amiaddr_to_dict_partial(self):
-            self.assertEquals(
-                amiaddr_to_dict('abc@ghi'),
-                {'host': 'ghi', 'port': 5038,
-                 'username': 'abc', 'secret': 'secret'}
-            )
-
-        def test_amiaddr_to_dict_full(self):
-            self.assertEquals(
-                amiaddr_to_dict('abc:def@ghi:123'),
-                {'host': 'ghi', 'port': 123,
-                 'username': 'abc', 'secret': 'def'}
-            )
-
-        def test_translate_queuestatus(self):
-            queue_data = [
-                ({'Message': 'Queue status will follow', 'Response':
-                 'Success', 'ActionID': '1333717971.396309-3'}, {'Queue': '22',
-                 'Action': 'QueueStatus', 'ActionID': '1333717971.398761-3'}),
-                ({'ServicelevelPerf': '0.0', 'TalkTime': '30', 'Calls': '31',
-                  'Max': '12', 'Completed': '32', 'ServiceLevel': '0',
-                  'Strategy': 'random', 'Queue': '22', 'Weight': '0',
-                  'ActionID': '1333717971.396309-3', 'Holdtime': '33',
-                  'Event': 'QueueParams', 'Abandoned': '34'}, {'Queue': '22',
-                 'Action': 'QueueStatus', 'ActionID': '1333717971.398761-3'}),
-                ({'Message': 'Queue status will follow', 'Response': 'Success',
-                 'ActionID': '1333717971.398761-3'}, {'Queue': '22', 'Action':
-                 'QueueStatus', 'ActionID': '1333717971.398761-3'}),
-                ({'ServicelevelPerf': '0.0', 'TalkTime': '0', 'Calls': '0',
-                  'Max': '12', 'Completed': '0', 'ServiceLevel': '0',
-                  'Strategy': 'random', 'Queue': '22', 'Weight': '0',
-                  'ActionID': '1333717971.398761-3', 'Holdtime': '0',
-                  'Event': 'QueueParams', 'Abandoned': '1'}, {'Queue': '22',
-                 'Action': 'QueueStatus', 'ActionID': '1333717971.398761-3'}),
-                ({'Status': '1', 'Penalty': '0', 'Name':
-                  'Local/ID22@route_phoneaccount', 'Queue': '22',
-                  'Membership': 'static', 'Location':
-                  'Local/ID22@route_phoneaccount', 'LastCall': '0',
-                  'Paused': '0', 'Event': 'QueueMember', 'CallsTaken': '0',
-                  'ActionID': '1333717971.398761-3'}, {'Queue': '22',
-                 'Action': 'QueueStatus', 'ActionID': '1333717971.398761-3'}),
-                ({'Status': '1', 'Penalty': '0', 'Name':
-                  'Local/ID22@route_phoneaccount', 'Queue': '22',
-                  'Membership': 'static', 'Location':
-                  'Local/ID22@route_phoneaccount', 'LastCall': '0',
-                  'Paused': '0', 'Event': 'QueueMember', 'CallsTaken': '0',
-                  'ActionID': '1333717971.396309-3'}, {'Queue': '22',
-                 'Action': 'QueueStatus', 'ActionID': '1333717971.398761-3'}),
-                ({'Status': '1', 'Penalty': '0', 'Name':
-                  'Local/ID12@route_phoneaccount', 'Queue': '22',
-                  'Membership': 'static', 'Location':
-                  'Local/ID12@route_phoneaccount', 'LastCall': '0',
-                  'Paused': '0', 'Event': 'QueueMember', 'CallsTaken': '0',
-                  'ActionID': '1333717971.396309-3'}, {'Queue': '22',
-                 'Action': 'QueueStatus', 'ActionID': '1333717971.398761-3'}),
-                ({'Event': 'QueueStatusComplete', 'ActionID':
-                  '1333717971.396309-3'}, {'Queue': '22',
-                 'Action': 'QueueStatus', 'ActionID': '1333717971.398761-3'}),
-                ({'Status': '1', 'Penalty': '0', 'Name':
-                  'Local/ID12@route_phoneaccount', 'Queue': '22',
-                  'Membership': 'static', 'Location':
-                  'Local/ID12@route_phoneaccount', 'LastCall': '0',
-                  'Paused': '0', 'Event': 'QueueMember', 'CallsTaken': '0',
-                  'ActionID': '1333717971.398761-3'}, {'Queue': '22',
-                 'Action': 'QueueStatus', 'ActionID': '1333717971.398761-3'}),
-                ({'Event': 'QueueStatusComplete', 'ActionID':
-                  '1333717971.398761-3'}, {'Queue': '22',
-                 'Action': 'QueueStatus', 'ActionID': '1333717971.398761-3'}),
-            ]
-            output = translate_queuestatus(queue_data)
-            expected = {'completed': 32, 'holdtime': 33, 'abandoned': 35,
-                        'calls': 31, 'talktime': 30}
-            self.assertEquals(output, expected)
-
-        def test_translate_queuesummary(self):
-            queue_data = [
-                ({'Message': 'Queue summary will follow', 'Response':
-                  'Success', 'ActionID': '1334760883.002422-3'},
-                 {'Queue': '22', 'Action': 'QueueSummary', 'ActionID':
-                  '1334760883.002422-3'}),
-                ({'Available': '2', 'LoggedIn': '5', 'TalkTime': '8',
-                  'LongestHoldTime': '55', 'Queue': '22', 'Callers': '2',
-                  'ActionID': '1334760883.002422-3', 'HoldTime': '33', 'Event':
-                  'QueueSummary'}, {'Queue': '22', 'Action': 'QueueSummary',
-                 'ActionID': '1334760883.002422-3'}),
-                ({'Event': 'QueueSummaryComplete', 'ActionID':
-                  '1334760883.002422-3'}, {'Queue': '22',
-                 'Action': 'QueueSummary', 'ActionID': '1334760883.002422-3'}),
-                ({'Message': 'Queue summary will follow', 'Response':
-                  'Success', 'ActionID': '1334760883.002422-4'},
-                 {'Queue': '22', 'Action': 'QueueSummary',
-                  'ActionID': '1334760883.002422-4'}),
-                ({'Available': '2', 'LoggedIn': '5', 'TalkTime': '8',
-                  'LongestHoldTime': '0', 'Queue': '22', 'Callers': '0',
-                  'ActionID': '1334760883.002422-4', 'HoldTime': '0', 'Event':
-                  'QueueSummary'}, {'Queue': '22', 'Action': 'QueueSummary',
-                 'ActionID': '1334760883.002422-4'}),
-                ({'Event': 'QueueSummaryComplete', 'ActionID':
-                  '1334760883.002422-4'}, {'Queue': '22',
-                 'Action': 'QueueSummary', 'ActionID': '1334760883.002422-4'}),
-            ]
-            output = translate_queuesummary(queue_data)
-            expected = {'average_holdtime': 33, 'average_talktime': 16,
-                        'current_holdtime': 55, 'queued_callers': 2}
-            self.assertEquals(output, expected)
-
+def main():
     # What did the user want?
     command, args = ''.join(sys.argv[1:2]), sys.argv[2:]
-    if command == 'TestCase':
-        unittest.main()
-        assert False, 'we do not get here'
-    elif command == 'originate':
+    if command == 'originate':
         (channel, context, exten), args = args[0:3], args[3:]
     elif command in ('listen', 'reload'):
         pass
@@ -336,28 +220,29 @@ if __name__ == '__main__':
         assert len(ami_kwargs) == 1, 'Setting up multiple calls?'
         channel_originate(ami_kwargs[0], channel, {'Context': context,
                           'Exten': exten, 'Priority': 1})
-        print 'Originate probably succeeded.'
+        print('Originate probably succeeded.')
 
     # Reload the config
     elif command == 'reload':
         errors = reload_asterisken(ami_kwargs)
         success_count = len(ami_kwargs) - len(errors)
         if not errors:
-            print 'Reload successful on all %d asterisken.' % (success_count,)
+            print('Reload successful on all %d asterisken.' %
+                  (success_count,))
         else:
-            print ('Reload successful on %d (out of %d) asterisken.' %
-                   (success_count, len(ami_kwargs)))
+            print('Reload successful on %d (out of %d) asterisken.' %
+                  (success_count, len(ami_kwargs)))
             for error in errors:
-                print >>sys.stderr, '%s: %s' % (error[0]['host'], error[1])
+                print('%s: %s' % (error[0]['host'], error[1]), file=sys.stderr)
             sys.exit(1)
 
     # Info about a queue
     elif command == 'queuesummary':
-        print fetch_queuesummary(ami_kwargs, queue_id)
+        print(fetch_queuesummary(ami_kwargs, queue_id))
 
     # Not so useful
     elif command == 'queuestatus':
-        print fetch_queuestatus(ami_kwargs, queue_id)
+        print(fetch_queuestatus(ami_kwargs, queue_id))
 
     # Listen with one or more AMIs at the same time
     elif command == 'listen':
@@ -368,4 +253,8 @@ if __name__ == '__main__':
                              disconnect_mode=SequentialAmi.DIS_NEVER,
                              **ami_kwarg)
         errors = s.process()
-        print errors  # a list of error tuples [(ami_kwarg, error), ...]
+        print(errors)  # a list of error tuples [(ami_kwarg, error), ...]
+
+
+if __name__ == '__main__':
+    main()
