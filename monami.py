@@ -29,7 +29,7 @@ class TokenBufferedSocket(object):
     All timeouts mentioned are in seconds (floats are legal).
     """
 
-    def __init__(self, token='\n', on_data=None):
+    def __init__(self, token=b'\n', on_data=None):
         """
         Construct a TokenBufferedSocket. Parameter token specifies on which
         token lines should be plit. Parameter on_data is a callback which is
@@ -41,8 +41,8 @@ class TokenBufferedSocket(object):
         self._on_data = on_data
         self._timeout = 0.333
         self._sock = None
-        self._inbuf = ''
-        self._outbuf = ''
+        self._inbuf = b''
+        self._outbuf = b''
         self._blocksize = 4096
 
         self._alarm_time = None
@@ -52,8 +52,8 @@ class TokenBufferedSocket(object):
         Connect to the specified host and port.
         """
         timeout = connect_timeout or self._timeout
-        self.trace('|| Connect to %s:%s (timeout=%s)\n' %
-                   (host, port, timeout))
+        self.trace('|| Connect to %s:%s (timeout=%s)\n' % (
+            host, port, timeout))
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._sock.setblocking(0)  # takes effect after connect
         self._sock.settimeout(timeout)
@@ -135,8 +135,8 @@ class TokenBufferedSocket(object):
         if self._on_data:
             self._on_data(data)
         else:
-            raise NotImplementedError('Got data but no one to handle it!',
-                                      data)
+            raise NotImplementedError(
+                'Got data but no one to handle it!', data)
 
     def write(self, data, shutdown_when_written=False):
         """
@@ -165,7 +165,7 @@ class TokenBufferedSocket(object):
                 i = self._inbuf.index(self._token)
             except ValueError:
                 if last:
-                    data, self._inbuf = self._inbuf, ''
+                    data, self._inbuf = self._inbuf, b''
                     if not data:
                         break
                 else:
@@ -183,7 +183,7 @@ class TokenBufferedSocket(object):
             self.trace('|| Recv yielded: %s\n' % (e,))
             self.abort(e)
         else:
-            if ret == '':
+            if ret == b'':
                 self.trace('|| Recv yielded EOF\n')
                 self.abort()
             self.trace('<< %r (%d)\n' % (ret, len(ret)))
@@ -268,15 +268,15 @@ class SequentialAmi(object):
 
     def __init__(self, host, port=5038, username='username', secret='secret',
                  auth='plain', keepalive=None, disconnect_mode=DIS_WHEN_DONE):
-        if disconnect_mode not in (self.DIS_NEVER, self.DIS_WHEN_DONE,
-                                   self.DIS_IMMEDIATELY):
+        if disconnect_mode not in (
+                self.DIS_NEVER, self.DIS_WHEN_DONE, self.DIS_IMMEDIATELY):
             raise TypeError("invalid disconnect mode %r" % (disconnect_mode,))
         self._username = username
         self._secret = secret
         self._disconnect_mode = disconnect_mode
 
         # Privates
-        self._sock = TokenBufferedSocket(token='\r\n', on_data=self._on_line)
+        self._sock = TokenBufferedSocket(token=b'\r\n', on_data=self._on_line)
         self._first = True
         self._done = False
         self._iterations = 0
@@ -340,9 +340,10 @@ class SequentialAmi(object):
                 # Asynchronous adding of requests.
                 queue_id = queue_id_info_to_fetch()
                 if queue_id:
-                    s.add_action('QueueSummary', {'Queue': queue_id},
-                                 callback=on_queue_response,
-                                 stop_event='QueueSummaryComplete')
+                    s.add_action(
+                        'QueueSummary', {'Queue': queue_id},
+                        callback=on_queue_response,
+                        stop_event='QueueSummaryComplete')
                     s.next_action()
 
                 # Do a bit of work.
@@ -388,10 +389,10 @@ class SequentialAmi(object):
         requested action by ActionID.
         """
         if dict.get('Event'):
-            print('Got event: %s\n%s\n' % (dict['Event'],
-                                           '\n'.join('  %s\t%r' % (k, v)
-                                                     for k, v in dict.items()
-                                                     if k != 'Event')))
+            print('Got event: %s\n%s\n' % (
+                dict['Event'], '\n'.join(
+                    '  %s\t%r' % (k, v)
+                    for k, v in dict.items() if k != 'Event')))
         else:
             print('Unexpected:', dict)
 
@@ -411,6 +412,7 @@ class SequentialAmi(object):
         self._actions[identifier] = (parameters, callback, stop_event)
         msg = ('\r\n'.join(['%s: %s' % (k, parameters[k]) for k in parameters])
                + '\r\n\r\n')
+        msg = msg.encode('utf-8')
 
         if insertpos is None:
             self._outbuf.append(msg)
@@ -427,8 +429,9 @@ class SequentialAmi(object):
         if self._outbuf:
             data = self._outbuf.pop(0)
             self.trace('}} %r\n' % (data,))
-            last_action = ((not self._outbuf) and
-                           self._disconnect_mode == self.DIS_IMMEDIATELY)
+            last_action = (
+                not self._outbuf and
+                self._disconnect_mode == self.DIS_IMMEDIATELY)
             self._sock.write(data, shutdown_when_written=last_action)
             if last_action:
                 self._done = True
@@ -442,8 +445,9 @@ class SequentialAmi(object):
         # If disconnect_mode is not never, we expect results fairly quickly, so
         # there's a timeout.
         if self._disconnect_mode != self.DIS_NEVER:
-            self._sock.loop(absolute_timeout=absolute_timeout,
-                            relative_timeout=relative_timeout)
+            self._sock.loop(
+                absolute_timeout=absolute_timeout,
+                relative_timeout=relative_timeout)
             if not self._done:
                 raise MonAmiTimeout()  # XXX: add delta
         else:
@@ -472,18 +476,18 @@ class SequentialAmi(object):
         if self._first:
             # Asterisk 1.6.2 says: Asterisk Call Manager/1.1
             # Asterisk 10.3 says: Asterisk Call Manager/1.2
-            if (not data.startswith('Asterisk Call Manager/') or
-                    not data.endswith('\r\n')):
+            if (not data.startswith(b'Asterisk Call Manager/') or
+                    not data.endswith(b'\r\n')):
                 raise MonAmiError('Unexpected welcome message', data)
             self._first = False
             # Load up the login action
             self.next_action()
             return
 
-        if data == '\r\n':
+        if data == b'\r\n':
             self._on_raw_dict(self._inbuf)
             self._inbuf = []
-        elif not data.endswith('\r\n'):  # apparently EOF
+        elif not data.endswith(b'\r\n'):  # apparently EOF
             if len(data):
                 self._inbuf.append(self._inbuf)
             if len(self._inbuf):
@@ -496,12 +500,17 @@ class SequentialAmi(object):
     def _on_raw_dict(self, raw_dict):
         dict = {}
         for i, line in enumerate(raw_dict):
-            if (line.endswith('--END COMMAND--\r\n') and
+            if (line.endswith(b'--END COMMAND--\r\n') and
                     dict.get('Response') == 'Follows'):
                 dict[''] = line[0:-17]  # drop '--END COMMAND--\r\n'
             else:
-                key, value = line.split(':', 1)
-                dict[key.strip()] = value.strip()
+                key, value = line.split(b':', 1)
+                dict[key.strip().decode('ascii')] = value.strip()
+
+        # Decode values:
+        for k, v in dict.items():
+            dict[k] = v.decode('utf-8')
+
         self.trace('{{ %r\n' % (dict,))
         self.on_dict(dict)
 
@@ -511,7 +520,9 @@ class SequentialAmi(object):
         self.add_action('login', {
             'AuthType': 'MD5',
             'Username': self._username,
-            'Key': md5(response['Challenge'] + self._secret).hexdigest(),
+            'Key': (
+                md5(response['Challenge'].encode('ascii') + self._secret)
+                .hexdigest()),
             # Enable events using the Events-action. You don't need this unless
             # you're listening for the FullyBooted event which is sent
             # immediately.
@@ -624,9 +635,10 @@ def main():
         s.process()
 
     elif command == 'listen':
-        s = SequentialAmi(host, username=username, secret=secret, auth='md5',
-                          keepalive=60,
-                          disconnect_mode=SequentialAmi.DIS_NEVER)
+        s = SequentialAmi(
+            host, username=username, secret=secret, auth='md5',
+            keepalive=60,
+            disconnect_mode=SequentialAmi.DIS_NEVER)
         # If you have read=all perms in your manager.conf, you'll get flooded
         # with events now :)
         s.add_action('events', {'EventMask': 'on'})
